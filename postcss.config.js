@@ -66,9 +66,7 @@ const BugScoreCalculator = () => {
   const [slackURL, setSlackURL] = useState('');
   const [copyText, setCopyText] = useState('');
   const [darkMode, setDarkMode] = useState(false);
-  const [showAlert, setShowAlert] = useState(false);
   const copyTextRef = useRef(null);
-  const formRef = useRef(null);
 
   useEffect(() => {
     const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -81,23 +79,10 @@ const BugScoreCalculator = () => {
   }, []);
 
   const handleAnswer = (questionId, value) => {
-    setAnswers((prev) => {
-      const newAnswers = { ...prev, [questionId]: value };
-      if (Object.keys(newAnswers).length === questions.length) {
-        setShowAlert(false);
-      }
-      return newAnswers;
-    });
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const calculateScore = (e) => {
-    e.preventDefault();
-    if (Object.keys(answers).length < questions.length) {
-      setShowAlert(true);
-      return;
-    }
-    setShowAlert(false);
-
+  const calculateScore = () => {
     const q1Score = questions[0].options.find(opt => opt.value === answers.importance)?.score || 0;
     const q2Score = questions[1].options.find(opt => opt.value === answers.workaround)?.score || 0;
     const q3Score = questions[2].options.find(opt => opt.value === answers.customerType)?.score || 0;
@@ -140,9 +125,9 @@ Score: ${totalScore}`;
     <Container fluid className={`${themeClass} min-vh-100 py-3`}>
       <h2 className="text-center mb-4">Bug Score Calculator</h2>
       
-      <Form onSubmit={calculateScore} ref={formRef}>
-        <Row>
-          <Col md={4}>
+      <Row>
+        <Col md={4}>
+          <Form>
             <Form.Group className="mb-3">
               <Form.Label>Customer Name</Form.Label>
               <Form.Control
@@ -150,7 +135,6 @@ Score: ${totalScore}`;
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className={inputClass}
-                placeholder="Enter the customer's org name"
               />
             </Form.Group>
 
@@ -176,7 +160,6 @@ Score: ${totalScore}`;
                 value={monthlyARR}
                 onChange={(e) => setMonthlyARR(e.target.value)}
                 className={inputClass}
-                placeholder="Enter monthly ARR"
               />
             </Form.Group>
 
@@ -187,7 +170,6 @@ Score: ${totalScore}`;
                 value={intercomURL}
                 onChange={(e) => setIntercomURL(e.target.value)}
                 className={inputClass}
-                placeholder="Enter Intercom URL"
               />
             </Form.Group>
 
@@ -198,64 +180,59 @@ Score: ${totalScore}`;
                 value={slackURL}
                 onChange={(e) => setSlackURL(e.target.value)}
                 className={inputClass}
-                placeholder="Enter Slack URL"
               />
             </Form.Group>
-          </Col>
 
-          <Col md={4}>
+            <Button variant="primary" onClick={calculateScore}>Calculate Score</Button>
+          </Form>
+        </Col>
+
+        <Col md={8}>
+          <Row>
             {questions.map((question) => (
-              <Card className={`mb-3 ${themeClass}`} key={question.id}>
-                <Card.Body>
-                  <Card.Title>{question.text}</Card.Title>
-                  {question.options.map((option) => (
-                    <Form.Check
-                      key={option.value}
-                      type="radio"
-                      id={`${question.id}-${option.value}`}
-                      name={question.id}
-                      label={option.label}
-                      onChange={() => handleAnswer(question.id, option.value)}
-                    />
-                  ))}
-                </Card.Body>
-              </Card>
+              <Col md={6} key={question.id}>
+                <Card className={`mb-3 ${themeClass}`}>
+                  <Card.Body>
+                    <Card.Title>{question.text}</Card.Title>
+                    {question.options.map((option) => (
+                      <Form.Check
+                        key={option.value}
+                        type="radio"
+                        id={`${question.id}-${option.value}`}
+                        name={question.id}
+                        label={option.label}
+                        onChange={() => handleAnswer(question.id, option.value)}
+                      />
+                    ))}
+                  </Card.Body>
+                </Card>
+              </Col>
             ))}
-            {showAlert && (
-              <Alert variant="warning" onClose={() => setShowAlert(false)} dismissible>
-                Please answer all questions before calculating the score.
-              </Alert>
-            )}
-            <div className="d-flex justify-content-center mt-3">
-              <Button variant="primary" type="submit">Calculate Score</Button>
-            </div>
-          </Col>
+          </Row>
+        </Col>
+      </Row>
 
-          <Col md={4}>
-            {score !== null && (
-              <Card className={`mb-3 ${themeClass}`}>
-                <Card.Body>
-                  <Alert variant={getPriority(score).variant}>
-                    <Alert.Heading>Priority: {getPriority(score).text}</Alert.Heading>
-                    <p className="mb-0">Score: {score}</p>
-                  </Alert>
-                  <Form.Group className="mb-3">
-                    <Form.Control
-                      as="textarea"
-                      rows={4}
-                      ref={copyTextRef}
-                      readOnly
-                      value={copyText}
-                      className={inputClass}
-                    />
-                  </Form.Group>
-                  <Button variant="secondary" onClick={copyToClipboard}>Copy</Button>
-                </Card.Body>
-              </Card>
-            )}
-          </Col>
-        </Row>
-      </Form>
+      {score !== null && (
+        <Card className={`mt-4 ${themeClass}`}>
+          <Card.Body>
+            <Alert variant={getPriority(score).variant}>
+              <Alert.Heading>Priority: {getPriority(score).text}</Alert.Heading>
+              <p className="mb-0">Score: {score}</p>
+            </Alert>
+            <Form.Group className="mb-3">
+              <Form.Control
+                as="textarea"
+                rows={4}
+                ref={copyTextRef}
+                readOnly
+                value={copyText}
+                className={inputClass}
+              />
+            </Form.Group>
+            <Button variant="secondary" onClick={copyToClipboard}>Copy</Button>
+          </Card.Body>
+        </Card>
+      )}
     </Container>
   );
 };
