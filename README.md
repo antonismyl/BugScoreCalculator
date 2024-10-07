@@ -1,70 +1,18 @@
-# Getting Started with Create React App
+# Bug Score Calculator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
+The Bug Score Calculator is a tool I created to replace our Excel-based calculator with additional functionality and quality-of-life improvements.
 
-## Available Scripts
+## Main Features
+- Calculates a bug score based on a questionnaire (customer impact, workarounds, customer type, churn risk, and urgency), but instead of typing a letter, you just check a box 🤯. 
+- Provides a priority rating (Trivial, Minor, Major, Critical/Blocker) based on the calculated score (No more jumping between Excel and Confluence for 2 weeks after you get back from PTO to see what score corresponds with which priority (╯‵□′)╯︵┻━┻).
+- Allows for easy input of relevant bug information (👉ﾟヮﾟ)👉.
+- Generates a summary of the bug details and score for easy sharing in the ticket's description using click-to-copy functionality ヾ(⌐■_■)ノ♪.
+- Monthly to Annual ARR conversion (Opening the calculator app AND Excel just adds insult to injury) (∩^o^)⊃━☆.
+- Auto Light/Dark mode based on system settings (Searing your eyeballs is a choice now) 😎.
 
-In the project directory, you can run:
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## How It Works
+1. Team members input basic information about the bug (customer name, plan, monthly ARR, etc.)
+2. The app presents a series of questions about the bug's impact and urgency.
+3. Based on the answers, the app calculates a score and determines the bug's priority.
+4. A summary is generated, which can be easily copied and shared in the ticket description.
