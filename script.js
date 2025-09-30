@@ -82,8 +82,9 @@ const PRIORITY_THRESHOLDS = {
 
 // Step management
 let currentStep = 1;
-const totalSteps = TOTAL_STEPS;
-const stepTitles = STEP_TITLES;
+
+// DOM element cache for performance
+const elements = {};
 
 // Application data
 const appData = {
@@ -129,6 +130,21 @@ const editors = {};
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
+
+/**
+ * Debounces a function to limit how often it can be called
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
 /**
  * Sanitizes user input to prevent XSS attacks
@@ -287,12 +303,12 @@ function validateCurrentStep(currentStep, appData) {
         case 4: // Customer details
             const internalCheckbox = document.getElementById('internalReport');
             if (internalCheckbox && internalCheckbox.checked) {
-                // For story updates, customer comment is required
-                if (appData.reportType === 'story' && appData.ticketType === 'update') {
+                // For internal updates (bug or story), comment is required
+                if (appData.ticketType === 'update') {
                     const customerComment = document.getElementById('customerComment');
                     const value = editors.customerComment ? editors.customerComment.value() : (customerComment ? customerComment.value : '');
                     if (!value.trim()) {
-                        errors.push('Customer comment is required for story updates');
+                        errors.push('Comment is required for internal updates');
                         isValid = false;
                     }
                 }
@@ -501,9 +517,50 @@ function replaceImagePlaceholders(text, appData) {
     });
 }
 
+/**
+ * Caches commonly used DOM elements for better performance
+ */
+function cacheDOMElements() {
+    // Form elements - Step 4 (Customer Details)
+    elements.internalReport = document.getElementById('internalReport');
+    elements.customerName = document.getElementById('customerName');
+    elements.monthlyARR = document.getElementById('monthlyARR');
+    elements.planType = document.getElementById('planType');
+    elements.customPlanText = document.getElementById('customPlanText');
+    elements.customPlanScore = document.getElementById('customPlanScore');
+    elements.customerComment = document.getElementById('customerComment');
+    elements.externalFields = document.getElementById('externalFields');
+    elements.customPlanContainer = document.getElementById('customPlanContainer');
+
+    // Navigation elements
+    elements.prevBtn = document.getElementById('prevBtn');
+    elements.nextBtn = document.getElementById('nextBtn');
+    elements.navigationContainer = document.getElementById('navigationContainer');
+    elements.progressIndicator = document.getElementById('progressIndicator');
+    elements.quickProgressIndicator = document.getElementById('quickProgressIndicator');
+    elements.stepTitle = document.getElementById('stepTitle');
+    elements.progressBar = document.getElementById('progressBar');
+
+    // Output elements - Step 7
+    elements.scoreValue = document.getElementById('scoreValue');
+    elements.priorityText = document.getElementById('priorityText');
+    elements.priorityAlert = document.getElementById('priorityAlert');
+    elements.scoreProgressBar = document.getElementById('scoreProgressBar');
+    elements.copyText = document.getElementById('copyText');
+
+    // Quick calculator elements
+    elements.quickInternalReport = document.getElementById('quickInternalReport');
+    elements.quickPlanType = document.getElementById('quickPlanType');
+    elements.quickScoreValue = document.getElementById('quickScoreValue');
+    elements.quickPriorityText = document.getElementById('quickPriorityText');
+}
+
 // Event listener for when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded');
+
+    // Cache DOM elements for performance
+    cacheDOMElements();
 
     // Initialize dark mode based on system preference
     initDarkMode();
@@ -525,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Set up event listeners
     setupEventListeners();
-    
+
     // Show the first step
     showStep(1);
 });
@@ -664,8 +721,8 @@ function setupEventListeners() {
 
     if (quickStep8PrevBtn) {
         quickStep8PrevBtn.addEventListener('click', function() {
-            // Go back to step 1 (start)
-            showStep(1);
+            // Reset data and go back to step 1 (start)
+            startNewReport();
         });
     }
 
@@ -703,7 +760,7 @@ function showStep(stepNumber) {
     currentStep = stepNumber;
 
     // Hide all steps (including quick calc steps 8 and 9)
-    for (let i = 1; i <= totalSteps; i++) {
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
         const stepElement = document.getElementById(`step${i}`);
         if (stepElement) {
             stepElement.classList.add('hidden');
@@ -782,9 +839,9 @@ function updateProgressIndicator() {
             progressIndicator.classList.add('hidden');
         } else {
             progressIndicator.classList.remove('hidden');
-            if (stepTitleEl) stepTitleEl.textContent = stepTitles[currentStep - 1];
+            if (stepTitleEl) stepTitleEl.textContent = STEP_TITLES[currentStep - 1];
             if (progressBar) {
-                const progressPercent = (currentStep / totalSteps) * 100;
+                const progressPercent = (currentStep / TOTAL_STEPS) * 100;
                 progressBar.style.width = `${progressPercent}%`;
             }
         }
@@ -824,7 +881,7 @@ function updateNavigation() {
     } else if (currentStep === 9) {
         // Quick calculator results step
         if (quickStep9Navigation) quickStep9Navigation.classList.remove('hidden');
-    } else if (currentStep === 1 || currentStep === totalSteps) {
+    } else if (currentStep === 1 || currentStep === TOTAL_STEPS) {
         // Hide navigation for first and last steps of main flow
         navigationContainer.classList.add('hidden');
     } else if (currentStep === 2) {
@@ -858,6 +915,9 @@ function updateNavigation() {
         updateTabOrder();
     }
 }
+
+// Create debounced version for input events (150ms delay)
+const debouncedUpdateNavigation = debounce(updateNavigation, 150);
 
 /**
  * Updates tab order to make Next button come immediately after form elements
@@ -1001,7 +1061,7 @@ function canProceedFromCurrentStep() {
 function nextStep() {
     const validation = validateCurrentStep(currentStep, appData);
 
-    if (currentStep < totalSteps && validation.isValid) {
+    if (currentStep < TOTAL_STEPS && validation.isValid) {
         saveCurrentStepData();
 
         let nextStepNumber = currentStep + 1;
@@ -1174,15 +1234,38 @@ function handlePlanTypeChange(event) {
 function handleInternalReportToggle(event) {
     const isInternal = event.target.checked;
     const externalFields = document.getElementById('externalFields');
-    
+    const commentLabel = document.querySelector('label[for="customerComment"]');
+    const commentTextarea = document.getElementById('customerComment');
+
     if (externalFields) {
         if (isInternal) {
             externalFields.style.display = 'none';
             // Clear the fields when switching to internal
             document.getElementById('customerName').value = '';
             document.getElementById('monthlyARR').value = '';
+
+            // Update comment label and placeholder for internal
+            if (commentLabel) {
+                // Add required indicator for update tickets only
+                if (appData.ticketType === 'update') {
+                    commentLabel.innerHTML = 'Comment <span class="text-red-500">*</span>';
+                } else {
+                    commentLabel.textContent = 'Comment';
+                }
+            }
+            if (commentTextarea) {
+                commentTextarea.placeholder = 'Add context or notes...';
+            }
         } else {
             externalFields.style.display = 'block';
+
+            // Restore customer comment label and placeholder for external
+            if (commentLabel) {
+                commentLabel.textContent = 'Customer Comment';
+            }
+            if (commentTextarea) {
+                commentTextarea.placeholder = 'Paste relevant conversation or customer quote...';
+            }
         }
     }
 
@@ -1345,15 +1428,14 @@ function generateFinalOutput() {
     // Get sanitized data
     const sanitized = sanitizeAppData(appData);
 
-    // Determine customer info
-    let customerInfo;
-    let plan = 'N/A';
+    // Determine customer info header
+    let customerInfoHeader;
 
     if (appData.isInternal) {
-        customerInfo = 'Reported internally';
-        plan = 'Internal';
+        customerInfoHeader = '## Internal Report';
     } else {
-        customerInfo = sanitized.customerName || 'N/A';
+        const customerName = sanitized.customerName || 'N/A';
+        let plan = 'N/A';
 
         // Use the planType dropdown from customer details
         if (appData.planType) {
@@ -1363,9 +1445,11 @@ function generateFinalOutput() {
                 plan = appData.planType; // planType from dropdown is safe
             }
         }
+
+        const annualARR = parseFloat(appData.monthlyARR || 0) * 12;
+        customerInfoHeader = `## ${customerName}, Plan: ${plan}, ARR: $${Math.round(annualARR)}`;
     }
 
-    const annualARR = appData.isInternal ? 0 : (parseFloat(appData.monthlyARR || 0) * 12);
     const intercomLinks = formatURLsAsJIRALinks(sanitized.intercomURLs, 'intercom');
     const slackLinks = formatURLsAsJIRALinks(sanitized.slackURLs, 'slack');
     const customerComment = sanitized.customerComment || '';
@@ -1377,7 +1461,7 @@ function generateFinalOutput() {
         // Story template
         if (appData.ticketType === 'update') {
             // Story update: Only customer details + comment
-            template = `## ${customerInfo}, Plan: ${plan}, ARR: $${annualARR.toFixed(2)}
+            template = `${customerInfoHeader}
 **Intercom Links:** ${intercomLinks}
 **Slack Links:** ${slackLinks}`;
             if (customerComment.trim() !== '') {
@@ -1397,7 +1481,7 @@ ${sanitized.expectedFunctionality}
 ## Timeline & Context
 ${sanitized.timelineContext}
 
-## ${customerInfo}, Plan: ${plan}, ARR: $${annualARR.toFixed(2)}
+${customerInfoHeader}
 **Intercom Links:** ${intercomLinks}
 **Slack Links:** ${slackLinks}`;
             if (customerComment.trim() !== '') {
@@ -1420,7 +1504,7 @@ ${sanitized.timelineContext}
 
         if (appData.ticketType === 'update') {
             // For bug update tickets: Customer details + Questionnaire + Summary only
-            template = `## ${customerInfo}, Plan: ${plan}, ARR: $${annualARR.toFixed(2)}
+            template = `${customerInfoHeader}
 **Intercom Links:** ${intercomLinks}
 **Slack Links:** ${slackLinks}`;
             if (customerComment.trim() !== '') {
@@ -1429,6 +1513,7 @@ ${sanitized.timelineContext}
             template += `
 
 ${qaSection}**Final Score:** ${appData.calculatedScore}
+**Priority: ${appData.priority.text}**
 
 ## Summary
 ${sanitized.bugSummary}`;
@@ -1443,7 +1528,7 @@ ${sanitized.stepsToReproduce}
 ## Expected vs Actual Behavior
 ${sanitized.expectedVsActual}
 
-## ${customerInfo}, Plan: ${plan}, ARR: $${annualARR.toFixed(2)}
+${customerInfoHeader}
 **Intercom Links:** ${intercomLinks}
 **Slack Links:** ${slackLinks}`;
             if (customerComment.trim() !== '') {
@@ -1451,7 +1536,8 @@ ${sanitized.expectedVsActual}
             }
             template += `
 
-${qaSection}**Final Score:** ${appData.calculatedScore}`;
+${qaSection}**Final Score:** ${appData.calculatedScore}
+**Priority: ${appData.priority.text}**`;
         }
     }
 
@@ -1637,6 +1723,13 @@ function startNewReport() {
     // Reset image counter
     imageCounter = 0;
 
+    // Clear all EasyMDE editor instances
+    Object.keys(editors).forEach(editorKey => {
+        if (editors[editorKey] && editors[editorKey].value) {
+            editors[editorKey].value('');
+        }
+    });
+
     // Reset all form fields
     document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(input => {
         input.value = '';
@@ -1672,6 +1765,31 @@ function startNewReport() {
     const quickPlanScoreContext = document.getElementById('quickPlanScoreContext');
     if (quickPlanScoreContext) {
         quickPlanScoreContext.classList.add('hidden');
+    }
+
+    // Reset dynamic URL fields to single field
+    const intercomContainer = document.getElementById('intercomURLsContainer');
+    if (intercomContainer) {
+        intercomContainer.innerHTML = `
+            <div class="intercom-url-field mb-3">
+                <div class="flex gap-2">
+                    <input type="text" id="intercomURL0" placeholder="Enter Intercom URL" class="flex-1 px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:text-white">
+                    <button type="button" class="remove-intercom-btn hidden bg-red-500 hover:bg-red-600 text-white px-3 py-2.5 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">Remove</button>
+                </div>
+            </div>
+        `;
+    }
+
+    const slackContainer = document.getElementById('slackURLsContainer');
+    if (slackContainer) {
+        slackContainer.innerHTML = `
+            <div class="slack-url-field mb-3">
+                <div class="flex gap-2">
+                    <input type="text" id="slackURL0" placeholder="Enter Slack URL" class="flex-1 px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:text-white">
+                    <button type="button" class="remove-slack-btn hidden bg-red-500 hover:bg-red-600 text-white px-3 py-2.5 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">Remove</button>
+                </div>
+            </div>
+        `;
     }
 
     // Go back to step 1
@@ -1770,8 +1888,8 @@ function focusFirstElement(stepNumber) {
 function announceStepChange(stepNumber) {
     const announcements = document.getElementById('announcements');
     if (announcements) {
-        const stepTitle = stepTitles[stepNumber - 1];
-        announcements.textContent = `Step ${stepNumber} of ${totalSteps}: ${stepTitle}`;
+        const stepTitle = STEP_TITLES[stepNumber - 1];
+        announcements.textContent = `Step ${stepNumber} of ${TOTAL_STEPS}: ${stepTitle}`;
     }
 }
 
@@ -1785,7 +1903,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const expectedVsActualInput = document.getElementById('expectedVsActual');
         
         if (customerNameInput) {
-            customerNameInput.addEventListener('input', updateNavigation);
+            customerNameInput.addEventListener('input', debouncedUpdateNavigation);
         }
 
         // Add due diligence checkboxes validation
@@ -1806,7 +1924,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add monthly ARR validation
         const monthlyARRInput = document.getElementById('monthlyARR');
         if (monthlyARRInput) {
-            monthlyARRInput.addEventListener('input', updateNavigation);
+            monthlyARRInput.addEventListener('input', debouncedUpdateNavigation);
         }
 
         // Add plan type validation
@@ -1819,28 +1937,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (customPlanInput) {
-            customPlanInput.addEventListener('input', updateNavigation);
+            customPlanInput.addEventListener('input', debouncedUpdateNavigation);
         }
 
         if (customScoreInput) {
             customScoreInput.addEventListener('input', function() {
                 validateCustomScore(this);
-                updateNavigation();
+                debouncedUpdateNavigation();
             });
             customScoreInput.addEventListener('focus', showPlanScoreContext);
             customScoreInput.addEventListener('blur', hidePlanScoreContext);
         }
-        
+
         if (bugSummaryInput) {
-            bugSummaryInput.addEventListener('input', updateNavigation);
+            bugSummaryInput.addEventListener('input', debouncedUpdateNavigation);
         }
-        
+
         if (stepsToReproduceInput) {
-            stepsToReproduceInput.addEventListener('input', updateNavigation);
+            stepsToReproduceInput.addEventListener('input', debouncedUpdateNavigation);
         }
-        
+
         if (expectedVsActualInput) {
-            expectedVsActualInput.addEventListener('input', updateNavigation);
+            expectedVsActualInput.addEventListener('input', debouncedUpdateNavigation);
         }
         
         // Image paste functionality is now handled in initEasyMDE()
@@ -2125,59 +2243,40 @@ function showImagePasteErrorForEditor(editor, message = 'Error processing image'
 }
 
 /**
- * Initializes dynamic URL field functionality
+ * Generic function to handle dynamic field groups (Intercom/Slack URLs)
  */
-function initDynamicURLFields() {
-    let intercomCount = 1;
-    let slackCount = 1;
+function initDynamicFieldGroup(config) {
+    let fieldCount = 1;
+    const {
+        addButtonId,
+        containerId,
+        fieldClass,
+        removeBtnClass,
+        fieldIdPrefix,
+        placeholder
+    } = config;
 
-    // Add Intercom URL field
-    document.getElementById('addIntercomURL').addEventListener('click', function() {
-        const container = document.getElementById('intercomURLsContainer');
+    // Add field button
+    document.getElementById(addButtonId).addEventListener('click', function() {
+        const container = document.getElementById(containerId);
         const fieldDiv = document.createElement('div');
-        fieldDiv.className = 'intercom-url-field mb-3';
+        fieldDiv.className = `${fieldClass} mb-3`;
         fieldDiv.innerHTML = `
             <div class="flex gap-2">
-                <input type="text" id="intercomURL${intercomCount}" placeholder="Enter Intercom URL" class="flex-1 px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:text-white">
-                <button type="button" class="remove-intercom-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2.5 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">Remove</button>
+                <input type="text" id="${fieldIdPrefix}${fieldCount}" placeholder="${placeholder}" class="flex-1 px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:text-white">
+                <button type="button" class="${removeBtnClass} bg-red-500 hover:bg-red-600 text-white px-3 py-2.5 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">Remove</button>
             </div>
         `;
         container.appendChild(fieldDiv);
-        intercomCount++;
+        fieldCount++;
         updateRemoveButtonsVisibility();
         updateNavigation();
     });
 
-    // Add Slack URL field
-    document.getElementById('addSlackURL').addEventListener('click', function() {
-        const container = document.getElementById('slackURLsContainer');
-        const fieldDiv = document.createElement('div');
-        fieldDiv.className = 'slack-url-field mb-3';
-        fieldDiv.innerHTML = `
-            <div class="flex gap-2">
-                <input type="text" id="slackURL${slackCount}" placeholder="Enter Slack URL" class="flex-1 px-3 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:text-white">
-                <button type="button" class="remove-slack-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2.5 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">Remove</button>
-            </div>
-        `;
-        container.appendChild(fieldDiv);
-        slackCount++;
-        updateRemoveButtonsVisibility();
-        updateNavigation();
-    });
-
-    // Handle remove buttons for Intercom URLs
-    document.getElementById('intercomURLsContainer').addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-intercom-btn')) {
-            e.target.closest('.intercom-url-field').remove();
-            updateRemoveButtonsVisibility();
-            updateNavigation();
-        }
-    });
-
-    // Handle remove buttons for Slack URLs
-    document.getElementById('slackURLsContainer').addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-slack-btn')) {
-            e.target.closest('.slack-url-field').remove();
+    // Handle remove buttons
+    document.getElementById(containerId).addEventListener('click', function(e) {
+        if (e.target.classList.contains(removeBtnClass)) {
+            e.target.closest(`.${fieldClass}`).remove();
             updateRemoveButtonsVisibility();
             updateNavigation();
         }
@@ -2185,28 +2284,41 @@ function initDynamicURLFields() {
 
     // Show/hide remove buttons based on number of fields
     function updateRemoveButtonsVisibility() {
-        const intercomFields = document.querySelectorAll('.intercom-url-field');
-        const slackFields = document.querySelectorAll('.slack-url-field');
-
-        // Show remove buttons only if more than one field exists
-        intercomFields.forEach((field, index) => {
-            const removeBtn = field.querySelector('.remove-intercom-btn');
-            if (intercomFields.length > 1) {
-                removeBtn.classList.remove('hidden');
-            } else {
-                removeBtn.classList.add('hidden');
-            }
-        });
-
-        slackFields.forEach((field, index) => {
-            const removeBtn = field.querySelector('.remove-slack-btn');
-            if (slackFields.length > 1) {
+        const fields = document.querySelectorAll(`.${fieldClass}`);
+        fields.forEach((field) => {
+            const removeBtn = field.querySelector(`.${removeBtnClass}`);
+            if (fields.length > 1) {
                 removeBtn.classList.remove('hidden');
             } else {
                 removeBtn.classList.add('hidden');
             }
         });
     }
+}
+
+/**
+ * Initializes dynamic URL field functionality
+ */
+function initDynamicURLFields() {
+    // Initialize Intercom URL fields
+    initDynamicFieldGroup({
+        addButtonId: 'addIntercomURL',
+        containerId: 'intercomURLsContainer',
+        fieldClass: 'intercom-url-field',
+        removeBtnClass: 'remove-intercom-btn',
+        fieldIdPrefix: 'intercomURL',
+        placeholder: 'Enter Intercom URL'
+    });
+
+    // Initialize Slack URL fields
+    initDynamicFieldGroup({
+        addButtonId: 'addSlackURL',
+        containerId: 'slackURLsContainer',
+        fieldClass: 'slack-url-field',
+        removeBtnClass: 'remove-slack-btn',
+        fieldIdPrefix: 'slackURL',
+        placeholder: 'Enter Slack URL'
+    });
 }
 
 /**
@@ -2392,7 +2504,7 @@ function addStoryFieldListeners() {
     storyFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
-            field.addEventListener('input', updateNavigation);
+            field.addEventListener('input', debouncedUpdateNavigation);
         }
     });
 }
@@ -2699,7 +2811,7 @@ function generateQuickCalculatorOutput() {
     });
 
     questionnaireResults += `**Final Score:** ${appData.calculatedScore}\n`;
-    questionnaireResults += `**Priority:** ${appData.priority.text}`;
+    questionnaireResults += `**Priority: ${appData.priority.text}**`;
 
     // Update the UI
     updateQuickCalculatorResults(questionnaireResults);

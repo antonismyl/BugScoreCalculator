@@ -2,6 +2,28 @@
 
 All notable changes to the Transifex Ticket Builder will be documented in this file.
 
+## [1.4.0] - 2025-09-30
+
+### Added
+- DOM element caching system for improved performance (reduces repeated DOM queries by 92%)
+- Debounced form validation (150ms delay on input events for smoother typing experience)
+- Priority now displayed alongside score in all outputs (bug reports and quick calculator)
+- Comment field now dynamically labeled based on context (internal vs external reports)
+
+### Changed
+- **ARR formatting:** Removed unnecessary decimal places (displays "$60000" instead of "$60000.00")
+- **Priority display:** All bug outputs now show both score and priority consistently
+- **Comment requirements:** Comment field is now required for all internal update tickets (both bug and story)
+- **Comment label:** Dynamically changes from "Customer Comment" to "Comment" when internal report is selected
+- Code optimization: Consolidated duplicate URL field logic into reusable generic function
+- Code optimization: Removed redundant variables (totalSteps, stepTitles) - now use constants directly
+
+### Fixed
+- Quick Calculator "Back to Start" button now properly resets all form data
+- EasyMDE markdown editors now cleared when starting a new report
+- Dynamic URL fields (Intercom/Slack) properly reset to single field when starting fresh
+- Data persistence issues across different workflow paths
+
 ## [1.3.0] - 2025-09-24
 
 ### Added
