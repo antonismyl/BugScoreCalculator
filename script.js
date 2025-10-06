@@ -184,6 +184,14 @@ function sanitizeAppData(appData) {
 }
 
 /**
+ * Formats a number as currency with thousand separators and no decimals
+ */
+function formatCurrency(value) {
+    const rounded = Math.round(value);
+    return rounded.toLocaleString('en-US');
+}
+
+/**
  * Gets the score based on the selected plan type from customer details
  */
 function getPlanTypeScore(appData) {
@@ -1447,7 +1455,7 @@ function generateFinalOutput() {
         }
 
         const annualARR = parseFloat(appData.monthlyARR || 0) * 12;
-        customerInfoHeader = `## ${customerName}, Plan: ${plan}, ARR: $${Math.round(annualARR)}`;
+        customerInfoHeader = `## ${customerName}, Plan: ${plan}, ARR: $${formatCurrency(annualARR)}`;
     }
 
     const intercomLinks = formatURLsAsJIRALinks(sanitized.intercomURLs, 'intercom');
